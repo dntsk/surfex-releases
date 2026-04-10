@@ -1,792 +1,1151 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SurfEx — Displacement Texture Tool</title>
-  <meta name="description" content="Desktop app for applying displacement textures to 3D meshes." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #060810;
-      --surface:  #0d1020;
-      --surface2: #131728;
-      --border:   #1a2040;
-      --border2:  #232c50;
-      --accent:   #4d9cf8;
-      --accent2:  #a78bfa;
-      --warm:     #ff7849;
-      --text:     #dde4f0;
-      --muted:    #4e5870;
-      --muted2:   #7d8aaa;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* ── NAV ── */
-    nav {
-      position: fixed;
-      inset: 0 0 auto 0;
-      z-index: 100;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 48px;
-      background: rgba(6, 8, 16, 0.8);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-tagline {
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--muted);
-      letter-spacing: .02em;
-      -webkit-text-fill-color: var(--muted);
-    }
-
-    .nav-logo {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-size: 18px;
-      letter-spacing: -0.02em;
-      background: linear-gradient(120deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-decoration: none;
-    }
-
-    .nav-right { display: flex; align-items: center; gap: 20px; }
-
-    .lang-toggle {
-      display: flex;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .lang-btn {
-      background: none;
-      border: none;
-      color: var(--muted2);
-      font-family: 'Inter', monospace;
-      font-size: 12px;
-      padding: 5px 13px;
-      cursor: pointer;
-      transition: all .15s;
-    }
-    .lang-btn.active { background: var(--border2); color: var(--text); }
-
-    .nav-dl {
-      font-family: 'Inter', monospace;
-      font-size: 12px;
-      color: var(--accent);
-      text-decoration: none;
-      padding: 6px 16px;
-      border: 1px solid rgba(77,156,248,.25);
-      border-radius: 8px;
-      transition: all .15s;
-    }
-    .nav-dl:hover { background: rgba(77,156,248,.08); border-color: rgba(77,156,248,.5); }
-
-    /* ── HERO ── */
-    #hero {
-      position: relative;
-      height: 100vh;
-      min-height: 600px;
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-    }
-
-    #mesh-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    /* Vignette — fade canvas on left and bottom */
-    #hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(to right,  var(--bg) 30%, transparent 70%),
-        linear-gradient(to top,    var(--bg) 0%,  transparent 30%);
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 2;
-      padding: 0 80px;
-      max-width: 620px;
-    }
-
-    .hero-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-family: 'Inter', monospace;
-      font-size: 11px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      padding: 5px 14px;
-      background: rgba(77,156,248,.07);
-      border: 1px solid rgba(77,156,248,.18);
-      border-radius: 100px;
-      margin-bottom: 28px;
-    }
-    .hero-label::before {
-      content: '';
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: blink 2s ease-in-out infinite;
-    }
-    @keyframes blink {
-      0%,100% { opacity:1; } 50% { opacity:.3; }
-    }
-
-    h1 {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-size: clamp(44px, 5.5vw, 76px);
-      line-height: 1.0;
-      letter-spacing: -0.04em;
-      margin-bottom: 24px;
-    }
-
-    .h1-name {
-      display: block;
-      background: linear-gradient(135deg, #c8d8f4, #8aaad4);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .h1-tagline {
-      display: block;
-      font-size: .3em;
-      font-weight: 400;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--muted2);
-      -webkit-text-fill-color: var(--muted2);
-      margin-top: 6px;
-      margin-bottom: 2px;
-    }
-
-    .h1-sub {
-      display: block;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: .75em;
-      margin-top: 4px;
-    }
-
-    .hero-desc {
-      font-size: 17px;
-      font-weight: 300;
-      color: var(--muted2);
-      line-height: 1.65;
-      margin-bottom: 44px;
-      max-width: 440px;
-    }
-    .hero-desc strong { color: var(--text); font-weight: 500; }
-
-    .btn-dl {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: linear-gradient(135deg, #ff7849, #ffaa5c);
-      color: #fff;
-      font-size: 15px;
-      font-weight: 500;
-      text-decoration: none;
-      padding: 13px 26px;
-      border-radius: 10px;
-      box-shadow: 0 4px 20px rgba(255,120,73,.35);
-      transition: transform .2s, box-shadow .2s;
-      border: none;
-      cursor: pointer;
-    }
-    .btn-dl:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 28px rgba(255,120,73,.5);
-    }
-
-    .dl-note {
-      margin-top: 12px;
-      font-family: 'Inter', monospace;
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    /* ── FEATURES ── */
-    #features {
-      padding: 120px 80px 80px;
-    }
-
-    .sec-tag {
-      font-family: 'Inter', monospace;
-      font-size: 11px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 12px;
-    }
-
-    .sec-title {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-size: clamp(28px, 3vw, 42px);
-      letter-spacing: -.03em;
-      margin-bottom: 52px;
-    }
-
-    .feat-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    .feat {
-      background: var(--surface);
-      padding: 36px;
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      transition: background .2s;
-    }
-    .feat:hover { background: var(--surface2); }
-    .feat:nth-child(3n) { border-right: none; }
-    .feat:nth-child(4), .feat:nth-child(5), .feat:nth-child(6) { border-bottom: none; }
-
-    .feat-icon {
-      width: 42px; height: 42px;
-      border-radius: 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 20px;
-    }
-    .feat:nth-child(3n+1) .feat-icon { color: var(--accent); }
-    .feat:nth-child(3n+2) .feat-icon { color: var(--accent2); }
-    .feat:nth-child(3n+3) .feat-icon { color: var(--warm); }
-
-    .feat-title {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: -.01em;
-      margin-bottom: 8px;
-    }
-    .feat-desc { font-size: 13px; color: var(--muted2); line-height: 1.6; }
-
-    /* ── STEPS ── */
-    #steps {
-      padding: 80px;
-    }
-
-    .steps-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 32px;
-      margin-top: 52px;
-      position: relative;
-    }
-    .steps-row::before {
-      content: '';
-      position: absolute;
-      top: 26px;
-      left: calc(16.6% + 16px);
-      right: calc(16.6% + 16px);
-      height: 1px;
-      background: var(--border2);
-    }
-
-    .step {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 16px;
-    }
-    .step-n {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      border: 1px solid var(--border2);
-      background: var(--surface);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Inter', monospace;
-      font-size: 13px;
-      color: var(--muted2);
-      position: relative; z-index: 1;
-    }
-    .step:nth-child(2) .step-n {
-      border-color: rgba(77,156,248,.4);
-      color: var(--accent);
-      background: rgba(77,156,248,.07);
-    }
-    .step-title {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: -.01em;
-      margin-bottom: 6px;
-    }
-    .step-desc { font-size: 13px; color: var(--muted2); line-height: 1.6; }
-
-    /* ── DOWNLOAD ── */
-    #download {
-      padding: 80px;
-      border-top: 1px solid var(--border);
-    }
-
-    .dl-inner {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 64px 72px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 72px;
-      align-items: center;
-    }
-
-    .dl-left h2 {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-size: 36px;
-      letter-spacing: -.03em;
-      line-height: 1.1;
-      margin-bottom: 12px;
-    }
-    .dl-left p { font-size: 14px; color: var(--muted2); margin-bottom: 28px; }
-    .ver-badge {
-      font-family: 'Inter', monospace;
-      font-size: 11px;
-      color: var(--muted2);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 3px 10px;
-      display: inline-block;
-    }
-
-    .platforms { display: flex; flex-direction: column; gap: 10px; }
-
-    .plat {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 18px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      text-decoration: none;
-      color: var(--text);
-      transition: all .2s;
-    }
-    .plat:hover {
-      border-color: var(--border2);
-      background: var(--surface2);
-      transform: translateX(3px);
-    }
-    .plat-left { display: flex; align-items: center; gap: 12px; }
-    .plat-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--muted2); }
-    .plat-name { font-size: 14px; font-weight: 500; }
-    .plat-ext { font-family: 'Inter', monospace; font-size: 11px; color: var(--muted); }
-    .plat-arr { color: var(--muted); transition: color .2s; }
-    .plat:hover .plat-arr { color: var(--accent); }
-
-    /* ── FOOTER ── */
-    footer {
-      padding: 32px 80px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .foot-logo {
-      font-family: 'Inter', sans-serif;
-      font-weight: 800;
-      font-size: 15px;
-      background: linear-gradient(120deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .foot-links { display: flex; gap: 24px; list-style: none; }
-    .foot-links a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color .2s; }
-    .foot-links a:hover { color: var(--text); }
-    .foot-copy { font-family: 'Inter', monospace; font-size: 11px; color: var(--muted); }
-
-    /* ── REVEAL ── */
-    .rev { opacity: 0; transform: translateY(20px); transition: opacity .55s ease, transform .55s ease; }
-    .rev.on { opacity: 1; transform: none; }
-    .d1 { transition-delay: .1s; } .d2 { transition-delay: .2s; } .d3 { transition-delay: .3s; }
-    .d4 { transition-delay: .4s; } .d5 { transition-delay: .5s; }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 860px) {
-      nav { padding: 0 24px; }
-      .hero-content { padding: 0 24px; }
-      #features, #steps, #download, footer { padding-left: 24px; padding-right: 24px; }
-      .feat-grid { grid-template-columns: 1fr; }
-      .feat { border-right: none !important; }
-      .feat:last-child { border-bottom: none !important; }
-      .steps-row { grid-template-columns: 1fr; }
-      .steps-row::before { display: none; }
-      .dl-inner { grid-template-columns: 1fr; gap: 40px; padding: 40px 28px; }
-      footer { flex-direction: column; gap: 20px; text-align: center; }
-    }
-  </style>
-</head>
-<body>
-
-<nav>
-  <a href="#" class="nav-logo">SurfEx <span class="nav-tagline">Surface Extruder</span></a>
-  <div class="nav-right">
-    <div class="lang-toggle">
-      <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
-      <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
-    </div>
-    <a href="docs.html" class="nav-dl" style="border-color: var(--border); color: var(--muted2);" data-i18n="nav_docs">Docs</a>
-    <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="nav-dl" data-i18n="nav_dl">Download</a>
-  </div>
-</nav>
-
-<!-- HERO -->
-<section id="hero">
-  <canvas id="mesh-canvas"></canvas>
-  <div class="hero-content">
-    <div class="hero-label" data-i18n="hero_label">Desktop App · Free</div>
-    <h1>
-      <span class="h1-name">SurfEx</span>
-      <span class="h1-tagline">Surface Extruder</span>
-      <span class="h1-sub" data-i18n="hero_sub">Add texture to the surface of any 3D model</span>
-    </h1>
-    <p class="hero-desc" data-i18n="hero_desc">
-      Apply <strong>displacement textures</strong> to any 3D mesh. Set amplitude in millimetres, export a print-ready STL.
-    </p>
-    <a id="btn-dl" href="https://github.com/DNTSK/surfex-releases/releases/latest" class="btn-dl">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>
-      <span id="btn-dl-label" data-i18n="dl_mac">Download for macOS</span>
-    </a>
-    <div class="dl-note" data-i18n="dl_note">macOS · Windows · Linux &nbsp;·&nbsp; Free</div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section id="features">
-  <div class="rev">
-    <div class="sec-tag" data-i18n="feat_tag">Features</div>
-    <div class="sec-title" data-i18n="feat_title">Built for precision</div>
-  </div>
-  <div class="feat-grid">
-    <div class="feat rev d1">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f1t">Displacement Textures</div>
-      <div class="feat-desc" data-i18n="f1d">Built-in and custom displacement maps. Amplitude in millimetres — no unitless coefficients.</div>
-    </div>
-    <div class="feat rev d2">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f2t">Adaptive Subdivision</div>
-      <div class="feat-desc" data-i18n="f2d">Control mesh density by max edge length in mm. Enough resolution for textures, light enough for slicers.</div>
-    </div>
-    <div class="feat rev d3">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f3t">Real-Time Preview</div>
-      <div class="feat-desc" data-i18n="f3d">3D viewport powered by Three.js. See the result before you export anything.</div>
-    </div>
-    <div class="feat rev d1">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f4t">Symmetric Mode</div>
-      <div class="feat-desc" data-i18n="f4d">Mirror displacement for perfectly symmetric textures. Essential for organic and repeating forms.</div>
-    </div>
-    <div class="feat rev d2">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f5t">Clean STL Export</div>
-      <div class="feat-desc" data-i18n="f5d">Watertight mesh, no holes, no T-junctions. Opens in OrcaSlicer and any other tool without issues.</div>
-    </div>
-    <div class="feat rev d3">
-      <div class="feat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      </div>
-      <div class="feat-title" data-i18n="f6t">Native Desktop App</div>
-      <div class="feat-desc" data-i18n="f6d">Built with Tauri — small binary, native performance, no Electron overhead. Works offline.</div>
-    </div>
-  </div>
-</section>
-
-<!-- STEPS -->
-<section id="steps">
-  <div class="rev">
-    <div class="sec-tag" data-i18n="steps_tag">Workflow</div>
-    <div class="sec-title" data-i18n="steps_title">Three steps</div>
-  </div>
-  <div class="steps-row">
-    <div class="step rev d1">
-      <div class="step-n">01</div>
-      <div>
-        <div class="step-title" data-i18n="s1t">Load your mesh</div>
-        <div class="step-desc" data-i18n="s1d">Drag and drop any STL file. SurfEx parses it instantly.</div>
-      </div>
-    </div>
-    <div class="step rev d2">
-      <div class="step-n">02</div>
-      <div>
-        <div class="step-title" data-i18n="s2t">Configure texture</div>
-        <div class="step-desc" data-i18n="s2d">Pick a displacement map, set amplitude and edge length. Preview updates live.</div>
-      </div>
-    </div>
-    <div class="step rev d3">
-      <div class="step-n">03</div>
-      <div>
-        <div class="step-title" data-i18n="s3t">Export &amp; print</div>
-        <div class="step-desc" data-i18n="s3d">Export a clean watertight STL. Open in your slicer and print.</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- DOWNLOAD -->
-<section id="download">
-  <div class="dl-inner rev">
-    <div class="dl-left">
-      <h2 data-i18n="dl_h2">Download SurfEx</h2>
-      <p data-i18n="dl_p">Free. No account. No telemetry.</p>
-      <span class="ver-badge">latest release on GitHub</span>
-    </div>
-    <div class="platforms">
-      <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
-        <div class="plat-left">
-          <div class="plat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
-          </div>
-          <div>
-            <div class="plat-name">macOS</div>
-            <div class="plat-ext">.dmg · Apple Silicon + Intel</div>
-          </div>
-        </div>
-        <svg class="plat-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </a>
-      <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
-        <div class="plat-left">
-          <div class="plat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.377v11.372H0zm12.623 0H24v11.372H12.623zM0 12.623h11.377V24H0zm12.623 0H24V24H12.623z"/></svg>
-          </div>
-          <div>
-            <div class="plat-name">Windows</div>
-            <div class="plat-ext">.msi · x64</div>
-          </div>
-        </div>
-        <svg class="plat-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </a>
-      <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
-        <div class="plat-left">
-          <div class="plat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <div>
-            <div class="plat-name">Linux</div>
-            <div class="plat-ext">.AppImage · .deb · x64</div>
-          </div>
-        </div>
-        <svg class="plat-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <span class="foot-logo">SurfEx</span>
-  <ul class="foot-links">
-    <li><a href="https://github.com/DNTSK/surfex-releases/releases" data-i18n="foot_rel">Releases</a></li>
-    <li><a href="https://github.com/DNTSK/surfex-releases/issues" data-i18n="foot_bug">Report a bug</a></li>
-  </ul>
-  <span class="foot-copy">© 2025 DNTSK</span>
-</footer>
-
-<script>
-/* ── i18n ── */
-const t = {
-  en: {
-    nav_dl:'Download', nav_docs:'Docs', hero_label:'Desktop App · Free',
-    hero_sub:'Add texture to the surface of any 3D model',
-    hero_desc:'Load an STL file, pick a pattern, set the depth in millimetres. Export a <strong>print-ready model</strong> in seconds.',
-    dl_mac:'Download for macOS', dl_win:'Download for Windows', dl_lnx:'Download for Linux',
-    dl_note:'macOS · Windows · Linux &nbsp;·&nbsp; Free',
-    feat_tag:'Features', feat_title:'Built for precision',
-    f1t:'Displacement Textures', f1d:'Built-in and custom displacement maps. Amplitude in millimetres — no unitless coefficients.',
-    f2t:'Adaptive Subdivision',  f2d:'Control mesh density by max edge length in mm. Enough resolution for textures, light enough for slicers.',
-    f3t:'Real-Time Preview',     f3d:'See the result before you export anything. Rotate, zoom, inspect.',
-    f4t:'Symmetric Mode',        f4d:'Mirror displacement for perfectly symmetric textures. Essential for organic and repeating forms.',
-    f5t:'Clean STL Export',      f5d:'Watertight mesh, no holes, no T-junctions. Opens in OrcaSlicer and any other tool.',
-    f6t:'Works Offline',         f6d:'No internet required. Small install, fast startup, no background processes.',
-    steps_tag:'Workflow', steps_title:'Three steps',
-    s1t:'Load your mesh',     s1d:'Drag and drop any STL file. SurfEx parses it instantly.',
-    s2t:'Configure texture',  s2d:'Pick a displacement map, set amplitude and edge length. Preview updates live.',
-    s3t:'Export & print',     s3d:'Export a clean watertight STL. Open in your slicer and print.',
-    dl_h2:'Download SurfEx', dl_p:'Free. No account. No telemetry.',
-    foot_rel:'Releases', foot_bug:'Report a bug',
-  },
-  ru: {
-    nav_dl:'Скачать', nav_docs:'Документация', hero_label:'Десктопное приложение · Бесплатно',
-    hero_sub:'Добавьте текстуру на поверхность 3D-модели',
-    hero_desc:'Загрузите STL-файл, выберите узор, задайте глубину в миллиметрах. Экспортируйте <strong>готовую модель</strong> за секунды.',
-    dl_mac:'Скачать для macOS', dl_win:'Скачать для Windows', dl_lnx:'Скачать для Linux',
-    dl_note:'macOS · Windows · Linux &nbsp;·&nbsp; Бесплатно',
-    feat_tag:'Возможности', feat_title:'Сделано для точности',
-    f1t:'Текстуры смещения',          f1d:'Встроенные и пользовательские карты смещения. Амплитуда в миллиметрах.',
-    f2t:'Адаптивное разбиение',        f2d:'Контроль плотности по максимальной длине ребра в мм. Достаточно мелко для текстур, легко для слайсера.',
-    f3t:'Предпросмотр',                    f3d:'Видите результат до экспорта. Вращайте, приближайте, смотрите со всех сторон.',
-    f4t:'Симметричный режим',          f4d:'Зеркальное смещение для идеально симметричных текстур.',
-    f5t:'Чистый экспорт STL',          f5d:'Герметичный меш без дыр и T-стыков. Открывается в OrcaSlicer без проблем.',
-    f6t:'Работает офлайн',             f6d:'Не требует интернета. Лёгкий установщик, быстрый запуск, никаких фоновых процессов.',
-    steps_tag:'Как это работает', steps_title:'Три шага',
-    s1t:'Загрузите меш',       s1d:'Перетащите любой STL-файл. SurfEx разберёт его мгновенно.',
-    s2t:'Настройте текстуру',  s2d:'Выберите карту смещения, задайте амплитуду и длину ребра. Предпросмотр обновляется сразу.',
-    s3t:'Экспорт и печать',    s3d:'Экспортируйте чистый герметичный STL. Откройте в слайсере и печатайте.',
-    dl_h2:'Скачать SurfEx', dl_p:'Бесплатно. Без аккаунта. Без телеметрии.',
-    foot_rel:'Релизы', foot_bug:'Сообщить о баге',
-  }
-};
-
-let lang = (navigator.language||'en').startsWith('ru') ? 'ru' : 'en';
-
-function setLang(l) {
-  lang = l;
-  document.documentElement.lang = l;
-  document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const v = t[l][el.dataset.i18n];
-    if (v !== undefined) el.innerHTML = v;
-  });
-  const plat = /win/i.test(navigator.userAgent) ? 'win' : /linux/i.test(navigator.userAgent) ? 'lnx' : 'mac';
-  const el = document.getElementById('btn-dl-label');
-  if (el) el.innerHTML = t[l]['dl_'+plat];
-}
-
-/* ── Canvas mesh ── */
-(function(){
-  const canvas = document.getElementById('mesh-canvas');
-  const ctx = canvas.getContext('2d');
-  const C = 24, R = 18;
-  let W, H, pts, raf;
-
-  function resize() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    canvas.width  = Math.round(W * devicePixelRatio);
-    canvas.height = Math.round(H * devicePixelRatio);
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.scale(devicePixelRatio, devicePixelRatio);
-    build();
-  }
-
-  function build() {
-    pts = [];
-    for (let r = 0; r <= R; r++)
-      for (let c = 0; c <= C; c++)
-        pts.push({ ox: c/C, oy: r/R, x: 0, y: 0, d: 0 });
-  }
-
-  function color(d, a) {
-    const v = (d + 1) * .5;
-    const r = Math.round(10  + v * 60);
-    const g = Math.round(16  + v * 100);
-    const b = Math.round(40  + v * 180);
-    return `rgba(${r},${g},${b},${a})`;
-  }
-
-  function frame(ts) {
-    const t = ts * .0005;
-    ctx.clearRect(0, 0, W, H);
-
-    const pad = 40;
-    pts.forEach(p => {
-      const d = Math.sin(p.ox * 10 + t * 1.2) * Math.cos(p.oy * 7  + t * .8) * .035
-              + Math.sin(p.ox * 4  - t * .6)  * Math.sin(p.oy * 5  + t * .9) * .02;
-      p.x = (p.ox + Math.sin(p.oy * 5 + t * .5) * .008) * (W - pad*2) + pad;
-      p.y = (p.oy + d) * (H - pad*2) + pad;
-      p.d = d;
-    });
-
-    const idx = (r,c) => r*(C+1)+c;
-    for (let r = 0; r < R; r++) {
-      for (let c = 0; c < C; c++) {
-        const a = pts[idx(r,c)], b = pts[idx(r,c+1)];
-        const cc = pts[idx(r+1,c)], d = pts[idx(r+1,c+1)];
-        tri(a,b,cc, (a.d+b.d+cc.d)/3);
-        tri(b,d,cc, (b.d+d.d+cc.d)/3);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SurfEx — Displacement Texture Tool</title>
+    <meta
+      name="description"
+      content="Desktop app for applying displacement textures to 3D meshes."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      body {
+        overflow-x: hidden;
       }
-    }
-    raf = requestAnimationFrame(frame);
-  }
 
-  function tri(a,b,c,d) {
-    ctx.beginPath();
-    ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y);
-    ctx.closePath();
-    ctx.fillStyle = color(d, .35);
-    ctx.fill();
-    ctx.strokeStyle = color(d*.4, .5);
-    ctx.lineWidth = .5;
-    ctx.stroke();
-  }
+      /* ── NAV ── */
+      nav {
+        position: fixed;
+        inset: 0 0 auto 0;
+        background: rgba(6, 8, 16, 0.8);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
 
-  const ro = new ResizeObserver(resize);
-  ro.observe(document.documentElement);
-  resize();
-  requestAnimationFrame(frame);
-})();
+      .nav-tagline {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+        -webkit-text-fill-color: var(--muted);
+      }
 
-/* ── Scroll reveal ── */
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('on'); });
-}, { threshold: .1 });
-document.querySelectorAll('.rev').forEach(el => io.observe(el));
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
 
-/* ── Init ── */
-setLang(lang);
-</script>
-</body>
+      .nav-dl {
+        font-family: "Inter", monospace;
+        font-size: 12px;
+        color: var(--accent);
+        text-decoration: none;
+        padding: 6px 16px;
+        border: 1px solid rgba(77, 156, 248, 0.25);
+        border-radius: 8px;
+        transition: all 0.15s;
+      }
+      .nav-dl:hover {
+        background: rgba(77, 156, 248, 0.08);
+        border-color: rgba(77, 156, 248, 0.5);
+      }
+
+      /* ── HERO ── */
+      #hero {
+        position: relative;
+        height: 100vh;
+        min-height: 600px;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      #mesh-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      /* Vignette — fade canvas on left and bottom */
+      #hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(to right, var(--bg) 30%, transparent 70%),
+          linear-gradient(to top, var(--bg) 0%, transparent 30%);
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 2;
+        padding: 0 80px;
+        max-width: 620px;
+      }
+
+      .hero-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        padding: 5px 14px;
+        background: rgba(77, 156, 248, 0.07);
+        border: 1px solid rgba(77, 156, 248, 0.18);
+        border-radius: 100px;
+        margin-bottom: 28px;
+      }
+      .hero-label::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: blink 2s ease-in-out infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      h1 {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: clamp(44px, 5.5vw, 76px);
+        line-height: 1;
+        letter-spacing: -0.04em;
+        margin-bottom: 24px;
+      }
+
+      .h1-name {
+        display: block;
+        background: linear-gradient(135deg, #c8d8f4, #8aaad4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .h1-tagline {
+        display: block;
+        font-size: 0.3em;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted2);
+        -webkit-text-fill-color: var(--muted2);
+        margin-top: 6px;
+        margin-bottom: 2px;
+      }
+
+      .h1-sub {
+        display: block;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 0.75em;
+        margin-top: 4px;
+      }
+
+      .hero-desc {
+        font-size: 17px;
+        font-weight: 300;
+        color: var(--muted2);
+        line-height: 1.65;
+        margin-bottom: 44px;
+        max-width: 440px;
+      }
+      .hero-desc strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .btn-dl {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: linear-gradient(135deg, #ff7849, #ffaa5c);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 500;
+        text-decoration: none;
+        padding: 13px 26px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(255, 120, 73, 0.35);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        border: none;
+        cursor: pointer;
+      }
+      .btn-dl:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(255, 120, 73, 0.5);
+      }
+
+      .dl-note {
+        margin-top: 12px;
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      /* ── FEATURES ── */
+      #features {
+        padding: 120px 80px 80px;
+      }
+
+      .sec-tag {
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 12px;
+      }
+
+      .sec-title {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: clamp(28px, 3vw, 42px);
+        letter-spacing: -0.03em;
+        margin-bottom: 52px;
+      }
+
+      .feat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+
+      .feat {
+        background: var(--surface);
+        padding: 36px;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        transition: background 0.2s;
+      }
+      .feat:hover {
+        background: var(--surface2);
+      }
+      .feat:nth-child(3n) {
+        border-right: none;
+      }
+      .feat:nth-child(4),
+      .feat:nth-child(5),
+      .feat:nth-child(6) {
+        border-bottom: none;
+      }
+
+      .feat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+      .feat:nth-child(3n + 1) .feat-icon {
+        color: var(--accent);
+      }
+      .feat:nth-child(3n + 2) .feat-icon {
+        color: var(--accent2);
+      }
+      .feat:nth-child(3n + 3) .feat-icon {
+        color: var(--warm);
+      }
+
+      .feat-title {
+        font-family: "Inter", sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+        margin-bottom: 8px;
+      }
+      .feat-desc {
+        font-size: 13px;
+        color: var(--muted2);
+        line-height: 1.6;
+      }
+
+      /* ── STEPS ── */
+      #steps {
+        padding: 80px;
+      }
+
+      .steps-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px;
+        margin-top: 52px;
+        position: relative;
+      }
+      .steps-row::before {
+        content: "";
+        position: absolute;
+        top: 26px;
+        left: calc(16.6% + 16px);
+        right: calc(16.6% + 16px);
+        height: 1px;
+        background: var(--border2);
+      }
+
+      .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+      }
+      .step-n {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 1px solid var(--border2);
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Inter", monospace;
+        font-size: 13px;
+        color: var(--muted2);
+        position: relative;
+        z-index: 1;
+      }
+      .step:nth-child(2) .step-n {
+        border-color: rgba(77, 156, 248, 0.4);
+        color: var(--accent);
+        background: rgba(77, 156, 248, 0.07);
+      }
+      .step-title {
+        font-family: "Inter", sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+        margin-bottom: 6px;
+      }
+      .step-desc {
+        font-size: 13px;
+        color: var(--muted2);
+        line-height: 1.6;
+      }
+
+      /* ── DOWNLOAD ── */
+      #download {
+        padding: 80px;
+        border-top: 1px solid var(--border);
+      }
+
+      .dl-inner {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 64px 72px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 72px;
+        align-items: center;
+      }
+
+      .dl-left h2 {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: 36px;
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        margin-bottom: 12px;
+      }
+      .dl-left p {
+        font-size: 14px;
+        color: var(--muted2);
+        margin-bottom: 28px;
+      }
+      .ver-badge {
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        color: var(--muted2);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 3px 10px;
+        display: inline-block;
+      }
+
+      .platforms {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .plat {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        text-decoration: none;
+        color: var(--text);
+        transition: all 0.2s;
+      }
+      .plat:hover {
+        border-color: var(--border2);
+        background: var(--surface2);
+        transform: translateX(3px);
+      }
+      .plat-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .plat-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted2);
+      }
+      .plat-name {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .plat-ext {
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .plat-arr {
+        color: var(--muted);
+        transition: color 0.2s;
+      }
+      .plat:hover .plat-arr {
+        color: var(--accent);
+      }
+
+      /* ── FOOTER ── */
+      footer {
+        padding: 32px 80px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .foot-logo {
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: 15px;
+        background: linear-gradient(120deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .foot-links {
+        display: flex;
+        gap: 24px;
+        list-style: none;
+      }
+      .foot-links a {
+        font-size: 13px;
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .foot-links a:hover {
+        color: var(--text);
+      }
+      .foot-copy {
+        font-family: "Inter", monospace;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      /* ── REVEAL ── */
+      .rev {
+        opacity: 0;
+        transform: translateY(20px);
+        transition:
+          opacity 0.55s ease,
+          transform 0.55s ease;
+      }
+      .rev.on {
+        opacity: 1;
+        transform: none;
+      }
+      .d1 {
+        transition-delay: 0.1s;
+      }
+      .d2 {
+        transition-delay: 0.2s;
+      }
+      .d3 {
+        transition-delay: 0.3s;
+      }
+      .d4 {
+        transition-delay: 0.4s;
+      }
+      .d5 {
+        transition-delay: 0.5s;
+      }
+
+      /* ── RESPONSIVE ── */
+      @media (max-width: 860px) {
+        nav {
+          padding: 0 24px;
+        }
+        .hero-content {
+          padding: 0 24px;
+        }
+        #features,
+        #steps,
+        #download,
+        footer {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+        .feat-grid {
+          grid-template-columns: 1fr;
+        }
+        .feat {
+          border-right: none !important;
+        }
+        .feat:last-child {
+          border-bottom: none !important;
+        }
+        .steps-row {
+          grid-template-columns: 1fr;
+        }
+        .steps-row::before {
+          display: none;
+        }
+        .dl-inner {
+          grid-template-columns: 1fr;
+          gap: 40px;
+          padding: 40px 28px;
+        }
+        footer {
+          flex-direction: column;
+          gap: 20px;
+          text-align: center;
+        }
+      }
+    </style>
+
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+      (function (m, e, t, r, i, k, a) {
+        m[i] =
+          m[i] ||
+          function () {
+            (m[i].a = m[i].a || []).push(arguments);
+          };
+        m[i].l = 1 * new Date();
+        for (var j = 0; j < document.scripts.length; j++) {
+          if (document.scripts[j].src === r) {
+            return;
+          }
+        }
+        ((k = e.createElement(t)),
+          (a = e.getElementsByTagName(t)[0]),
+          (k.async = 1),
+          (k.src = r),
+          a.parentNode.insertBefore(k, a));
+      })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=108484360", "ym");
+
+      ym(108484360, "init", {
+        ssr: true,
+        webvisor: true,
+        clickmap: true,
+        ecommerce: "dataLayer",
+        referrer: document.referrer,
+        url: location.href,
+        accurateTrackBounce: true,
+        trackLinks: true,
+      });
+    </script>
+    <noscript
+      ><div>
+        <img
+          src="https://mc.yandex.ru/watch/108484360"
+          style="position: absolute; left: -9999px"
+          alt=""
+        /></div
+    ></noscript>
+    <!-- /Yandex.Metrika counter -->
+  </head>
+  <body>
+    <nav>
+      <a href="#" class="nav-logo">SurfEx <span class="nav-tagline">Surface Extruder</span></a>
+      <div class="nav-right">
+        <div class="lang-toggle">
+          <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
+          <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
+        </div>
+        <a
+          href="docs.html"
+          class="nav-dl"
+          style="border-color: var(--border); color: var(--muted2)"
+          data-i18n="nav_docs"
+          >Docs</a
+        >
+        <a
+          href="https://github.com/DNTSK/surfex-releases/releases/latest"
+          class="nav-dl"
+          data-i18n="nav_dl"
+          >Download</a
+        >
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <section id="hero">
+      <canvas id="mesh-canvas"></canvas>
+      <div class="hero-content">
+        <div class="hero-label" data-i18n="hero_label">Desktop App · Free</div>
+        <h1>
+          <span class="h1-name">SurfEx</span>
+          <span class="h1-tagline">Surface Extruder</span>
+          <span class="h1-sub" data-i18n="hero_sub"
+            >Add texture to the surface of any 3D model</span
+          >
+        </h1>
+        <p class="hero-desc" data-i18n="hero_desc">
+          Apply <strong>displacement textures</strong> to any 3D mesh. Set amplitude in millimetres,
+          export a print-ready STL.
+        </p>
+        <a
+          id="btn-dl"
+          href="https://github.com/DNTSK/surfex-releases/releases/latest"
+          class="btn-dl"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span id="btn-dl-label" data-i18n="dl_mac">Download for macOS</span>
+        </a>
+        <div class="dl-note" data-i18n="dl_note">macOS · Windows · Linux &nbsp;·&nbsp; Free</div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features">
+      <div class="rev">
+        <div class="sec-tag" data-i18n="feat_tag">Features</div>
+        <div class="sec-title" data-i18n="feat_title">Built for precision</div>
+      </div>
+      <div class="feat-grid">
+        <div class="feat rev d1">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f1t">Displacement Textures</div>
+          <div class="feat-desc" data-i18n="f1d">
+            Built-in and custom displacement maps. Amplitude in millimetres — no unitless
+            coefficients.
+          </div>
+        </div>
+        <div class="feat rev d2">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"
+              />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f2t">Adaptive Subdivision</div>
+          <div class="feat-desc" data-i18n="f2d">
+            Control mesh density by max edge length in mm. Enough resolution for textures, light
+            enough for slicers.
+          </div>
+        </div>
+        <div class="feat rev d3">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18M9 21V9" />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f3t">Real-Time Preview</div>
+          <div class="feat-desc" data-i18n="f3d">
+            3D viewport powered by Three.js. See the result before you export anything.
+          </div>
+        </div>
+        <div class="feat rev d1">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f4t">Symmetric Mode</div>
+          <div class="feat-desc" data-i18n="f4d">
+            Mirror displacement for perfectly symmetric textures. Essential for organic and
+            repeating forms.
+          </div>
+        </div>
+        <div class="feat rev d2">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f5t">Clean STL Export</div>
+          <div class="feat-desc" data-i18n="f5d">
+            Watertight mesh, no holes, no T-junctions. Opens in OrcaSlicer and any other tool
+            without issues.
+          </div>
+        </div>
+        <div class="feat rev d3">
+          <div class="feat-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="M8 21h8M12 17v4" />
+            </svg>
+          </div>
+          <div class="feat-title" data-i18n="f6t">Native Desktop App</div>
+          <div class="feat-desc" data-i18n="f6d">
+            Built with Tauri — small binary, native performance, no Electron overhead. Works
+            offline.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEPS -->
+    <section id="steps">
+      <div class="rev">
+        <div class="sec-tag" data-i18n="steps_tag">Workflow</div>
+        <div class="sec-title" data-i18n="steps_title">Three steps</div>
+      </div>
+      <div class="steps-row">
+        <div class="step rev d1">
+          <div class="step-n">01</div>
+          <div>
+            <div class="step-title" data-i18n="s1t">Load your mesh</div>
+            <div class="step-desc" data-i18n="s1d">
+              Drag and drop any STL file. SurfEx parses it instantly.
+            </div>
+          </div>
+        </div>
+        <div class="step rev d2">
+          <div class="step-n">02</div>
+          <div>
+            <div class="step-title" data-i18n="s2t">Configure texture</div>
+            <div class="step-desc" data-i18n="s2d">
+              Pick a displacement map, set amplitude and edge length. Preview updates live.
+            </div>
+          </div>
+        </div>
+        <div class="step rev d3">
+          <div class="step-n">03</div>
+          <div>
+            <div class="step-title" data-i18n="s3t">Export &amp; print</div>
+            <div class="step-desc" data-i18n="s3d">
+              Export a clean watertight STL. Open in your slicer and print.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download">
+      <div class="dl-inner rev">
+        <div class="dl-left">
+          <h2 data-i18n="dl_h2">Download SurfEx</h2>
+          <p data-i18n="dl_p">Free. No account. No telemetry.</p>
+          <span class="ver-badge">latest release on GitHub</span>
+        </div>
+        <div class="platforms">
+          <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
+            <div class="plat-left">
+              <div class="plat-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="plat-name">macOS</div>
+                <div class="plat-ext">.dmg · Apple Silicon + Intel</div>
+              </div>
+            </div>
+            <svg
+              class="plat-arr"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
+            <div class="plat-left">
+              <div class="plat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M0 0h11.377v11.372H0zm12.623 0H24v11.372H12.623zM0 12.623h11.377V24H0zm12.623 0H24V24H12.623z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="plat-name">Windows</div>
+                <div class="plat-ext">.msi · x64</div>
+              </div>
+            </div>
+            <svg
+              class="plat-arr"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a href="https://github.com/DNTSK/surfex-releases/releases/latest" class="plat">
+            <div class="plat-left">
+              <div class="plat-icon">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path
+                    d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="plat-name">Linux</div>
+                <div class="plat-ext">.AppImage · .deb · x64</div>
+              </div>
+            </div>
+            <svg
+              class="plat-arr"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <span class="foot-logo">SurfEx</span>
+      <ul class="foot-links">
+        <li>
+          <a href="https://github.com/DNTSK/surfex-releases/releases" data-i18n="foot_rel"
+            >Releases</a
+          >
+        </li>
+        <li>
+          <a href="https://github.com/DNTSK/surfex-releases/issues" data-i18n="foot_bug"
+            >Report a bug</a
+          >
+        </li>
+      </ul>
+      <span class="foot-copy">© 2025 DNTSK</span>
+    </footer>
+
+    <script>
+      /* ── i18n ── */
+      const t = {
+        en: {
+          nav_dl: "Download",
+          nav_docs: "Docs",
+          hero_label: "Desktop App · Free",
+          hero_sub: "Add texture to the surface of any 3D model",
+          hero_desc:
+            "Load an STL file, pick a pattern, set the depth in millimetres. Export a <strong>print-ready model</strong> in seconds.",
+          dl_mac: "Download for macOS",
+          dl_win: "Download for Windows",
+          dl_lnx: "Download for Linux",
+          dl_note: "macOS · Windows · Linux &nbsp;·&nbsp; Free",
+          feat_tag: "Features",
+          feat_title: "Built for precision",
+          f1t: "Displacement Textures",
+          f1d: "Built-in and custom displacement maps. Amplitude in millimetres — no unitless coefficients.",
+          f2t: "Adaptive Subdivision",
+          f2d: "Control mesh density by max edge length in mm. Enough resolution for textures, light enough for slicers.",
+          f3t: "Real-Time Preview",
+          f3d: "See the result before you export anything. Rotate, zoom, inspect.",
+          f4t: "Symmetric Mode",
+          f4d: "Mirror displacement for perfectly symmetric textures. Essential for organic and repeating forms.",
+          f5t: "Clean STL Export",
+          f5d: "Watertight mesh, no holes, no T-junctions. Opens in OrcaSlicer and any other tool.",
+          f6t: "Works Offline",
+          f6d: "No internet required. Small install, fast startup, no background processes.",
+          steps_tag: "Workflow",
+          steps_title: "Three steps",
+          s1t: "Load your mesh",
+          s1d: "Drag and drop any STL file. SurfEx parses it instantly.",
+          s2t: "Configure texture",
+          s2d: "Pick a displacement map, set amplitude and edge length. Preview updates live.",
+          s3t: "Export & print",
+          s3d: "Export a clean watertight STL. Open in your slicer and print.",
+          dl_h2: "Download SurfEx",
+          dl_p: "Free. No account. No telemetry.",
+          foot_rel: "Releases",
+          foot_bug: "Report a bug",
+        },
+        ru: {
+          nav_dl: "Скачать",
+          nav_docs: "Документация",
+          hero_label: "Десктопное приложение · Бесплатно",
+          hero_sub: "Добавьте текстуру на поверхность 3D-модели",
+          hero_desc:
+            "Загрузите STL-файл, выберите узор, задайте глубину в миллиметрах. Экспортируйте <strong>готовую модель</strong> за секунды.",
+          dl_mac: "Скачать для macOS",
+          dl_win: "Скачать для Windows",
+          dl_lnx: "Скачать для Linux",
+          dl_note: "macOS · Windows · Linux &nbsp;·&nbsp; Бесплатно",
+          feat_tag: "Возможности",
+          feat_title: "Сделано для точности",
+          f1t: "Текстуры смещения",
+          f1d: "Встроенные и пользовательские карты смещения. Амплитуда в миллиметрах.",
+          f2t: "Адаптивное разбиение",
+          f2d: "Контроль плотности по максимальной длине ребра в мм. Достаточно мелко для текстур, легко для слайсера.",
+          f3t: "Предпросмотр",
+          f3d: "Видите результат до экспорта. Вращайте, приближайте, смотрите со всех сторон.",
+          f4t: "Симметричный режим",
+          f4d: "Зеркальное смещение для идеально симметричных текстур.",
+          f5t: "Чистый экспорт STL",
+          f5d: "Герметичный меш без дыр и T-стыков. Открывается в OrcaSlicer без проблем.",
+          f6t: "Работает офлайн",
+          f6d: "Не требует интернета. Лёгкий установщик, быстрый запуск, никаких фоновых процессов.",
+          steps_tag: "Как это работает",
+          steps_title: "Три шага",
+          s1t: "Загрузите меш",
+          s1d: "Перетащите любой STL-файл. SurfEx разберёт его мгновенно.",
+          s2t: "Настройте текстуру",
+          s2d: "Выберите карту смещения, задайте амплитуду и длину ребра. Предпросмотр обновляется сразу.",
+          s3t: "Экспорт и печать",
+          s3d: "Экспортируйте чистый герметичный STL. Откройте в слайсере и печатайте.",
+          dl_h2: "Скачать SurfEx",
+          dl_p: "Бесплатно. Без аккаунта. Без телеметрии.",
+          foot_rel: "Релизы",
+          foot_bug: "Сообщить о баге",
+        },
+      };
+
+      let lang = (navigator.language || "en").startsWith("ru") ? "ru" : "en";
+
+      function setLang(l) {
+        lang = l;
+        document.documentElement.lang = l;
+        document
+          .querySelectorAll("[data-lang]")
+          .forEach((b) => b.classList.toggle("active", b.dataset.lang === l));
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const v = t[l][el.dataset.i18n];
+          if (v !== undefined) el.innerHTML = v;
+        });
+        const plat = /win/i.test(navigator.userAgent)
+          ? "win"
+          : /linux/i.test(navigator.userAgent)
+            ? "lnx"
+            : "mac";
+        const el = document.getElementById("btn-dl-label");
+        if (el) el.innerHTML = t[l]["dl_" + plat];
+      }
+
+      /* ── Canvas mesh ── */
+      (function () {
+        const canvas = document.getElementById("mesh-canvas");
+        const ctx = canvas.getContext("2d");
+        const C = 24,
+          R = 18;
+        let W, H, pts, raf;
+
+        function resize() {
+          W = window.innerWidth;
+          H = window.innerHeight;
+          canvas.width = Math.round(W * devicePixelRatio);
+          canvas.height = Math.round(H * devicePixelRatio);
+          canvas.style.width = W + "px";
+          canvas.style.height = H + "px";
+          ctx.scale(devicePixelRatio, devicePixelRatio);
+          build();
+        }
+
+        function build() {
+          pts = [];
+          for (let r = 0; r <= R; r++)
+            for (let c = 0; c <= C; c++) pts.push({ ox: c / C, oy: r / R, x: 0, y: 0, d: 0 });
+        }
+
+        function color(d, a) {
+          const v = (d + 1) * 0.5;
+          const r = Math.round(10 + v * 60);
+          const g = Math.round(16 + v * 100);
+          const b = Math.round(40 + v * 180);
+          return `rgba(${r},${g},${b},${a})`;
+        }
+
+        function frame(ts) {
+          const t = ts * 0.0005;
+          ctx.clearRect(0, 0, W, H);
+
+          const pad = 40;
+          pts.forEach((p) => {
+            const d =
+              Math.sin(p.ox * 10 + t * 1.2) * Math.cos(p.oy * 7 + t * 0.8) * 0.035 +
+              Math.sin(p.ox * 4 - t * 0.6) * Math.sin(p.oy * 5 + t * 0.9) * 0.02;
+            p.x = (p.ox + Math.sin(p.oy * 5 + t * 0.5) * 0.008) * (W - pad * 2) + pad;
+            p.y = (p.oy + d) * (H - pad * 2) + pad;
+            p.d = d;
+          });
+
+          const idx = (r, c) => r * (C + 1) + c;
+          for (let r = 0; r < R; r++) {
+            for (let c = 0; c < C; c++) {
+              const a = pts[idx(r, c)],
+                b = pts[idx(r, c + 1)];
+              const cc = pts[idx(r + 1, c)],
+                d = pts[idx(r + 1, c + 1)];
+              tri(a, b, cc, (a.d + b.d + cc.d) / 3);
+              tri(b, d, cc, (b.d + d.d + cc.d) / 3);
+            }
+          }
+          raf = requestAnimationFrame(frame);
+        }
+
+        function tri(a, b, c, d) {
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.lineTo(c.x, c.y);
+          ctx.closePath();
+          ctx.fillStyle = color(d, 0.35);
+          ctx.fill();
+          ctx.strokeStyle = color(d * 0.4, 0.5);
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+
+        const ro = new ResizeObserver(resize);
+        ro.observe(document.documentElement);
+        resize();
+        requestAnimationFrame(frame);
+      })();
+
+      /* ── Scroll reveal ── */
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) e.target.classList.add("on");
+          });
+        },
+        { threshold: 0.1 },
+      );
+      document.querySelectorAll(".rev").forEach((el) => io.observe(el));
+
+      /* ── Init ── */
+      setLang(lang);
+    </script>
+  </body>
 </html>
