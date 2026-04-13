@@ -384,6 +384,7 @@
           <ul class="sidebar-links">
             <li><a href="#quickstart" data-i18n="sb_quick">Quick start</a></li>
             <li><a href="#params" data-i18n="sb_params">Parameters</a></li>
+            <li><a href="#patterns" data-i18n="sb_patterns">Built-in patterns</a></li>
             <li><a href="#export" data-i18n="sb_export">Export</a></li>
           </ul>
         </div>
@@ -653,6 +654,13 @@
           <p data-i18n="par_bucket_d"></p>
         </div>
 
+        <!-- Patterns -->
+        <div class="doc-section" id="patterns">
+          <h2 data-i18n="pat_title">Built-in patterns</h2>
+          <p data-i18n="pat_intro"></p>
+          <p data-i18n="pat_tip"></p>
+        </div>
+
         <!-- Export -->
         <div class="doc-section" id="export">
           <h2 data-i18n="exp_title">Export settings</h2>
@@ -831,6 +839,12 @@
           exp_sym_t: "Symmetric mode",
           exp_sym_d:
             "When enabled, the texture is mirrored across the centre of the UV map. Useful for objects that should look the same from both sides.",
+          sb_patterns: "Built-in patterns",
+          pat_title: "Built-in patterns",
+          pat_intro:
+            "SurfEx includes four procedural displacement patterns — Dots, Grid, Diamonds, and Waves — that can be used instead of a custom texture image. Select a pattern, then paint the surfaces you want to apply it to using the Bucket or Brush tool.",
+          pat_tip:
+            "<strong>Pattern not showing up?</strong> Two common causes: (1) <strong>Boundary margin</strong> is greater than 0 — set it to 0 and try again; (2) <strong>Scale</strong> is too large or too small for your model — adjust the Scale slider until the pattern becomes visible in the preview.",
         },
         ru: {
           nav_page: "Документация",
@@ -981,6 +995,12 @@
           exp_sym_t: "Симметричный режим",
           exp_sym_d:
             "При включении текстура зеркалится по центру UV-развёртки. Полезно для объектов, которые должны выглядеть одинаково с обеих сторон.",
+          sb_patterns: "Встроенные паттерны",
+          pat_title: "Встроенные паттерны",
+          pat_intro:
+            "SurfEx включает четыре процедурных паттерна смещения — Точки, Сетка, Ромбы и Волны — которые можно использовать вместо произвольного изображения текстуры. Выберите паттерн, затем закрасьте нужные поверхности инструментом Заливка или Кисть.",
+          pat_tip:
+            "<strong>Паттерн не появляется?</strong> Две частые причины: (1) <strong>Граничный отступ</strong> больше 0 — установите его в 0 и попробуйте снова; (2) <strong>Масштаб</strong> слишком большой или маленький для вашей модели — подберите значение ползунком Масштаб, пока паттерн не появится в превью.",
         },
       };
 
